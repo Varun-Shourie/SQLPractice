@@ -1,0 +1,240 @@
+/* Assignment 3 - Simple Joins and Queries, Varun Shourie */
+/* Q1 (6) (simple) List the first name, last name, years employed, 
+and certification renewal date of all guides who had to renew their 
+certifications in 2019 -- they are overdue. List by earliest date first. */
+SELECT P.FName AS "First Name",
+       P.LName AS "Last Name",
+       DATEDIFF(YEAR,P.Hiredate,GETDATE()) AS "Years Employed",
+       G.CertRenewDate AS "Certification Renewal Date"
+    FROM GUIDES G, PERSONNEL P
+	WHERE G.GID = P.PID
+	  AND YEAR(G.CertRenewDate) = '2019'
+ORDER BY G.CertRenewDate;
+
+/* Q2 (5) (simple) Which guides need to renew their certificates this year (2020)? 
+We need to contact them to remind them to renew so that they can work. Get their 
+first name, last name, hire date, and phone number. */
+SELECT P.FName AS "First Name",
+       P.LName AS "Last Name",
+       P.HireDate AS "Hire Date",
+       P.Phone AS "Phone Number" 
+    FROM GUIDES G, PERSONNEL P
+	WHERE G.GID = P.PID
+	  AND YEAR(G.CertRenewDate) = '2020';
+
+/* Q3 (8) (simple) List the first and last names and ages of all children at the 
+resort in 2019, alphaetically by family name and oldest child first. List each child 
+only once. Check year */
+SELECT DISTINCT F.FName AS "First Name",
+       G.RLName AS "Last Name",
+       DATEDIFF(YEAR,F.Birthdate,GETDATE()) AS "Ages of Children"
+    FROM FAMILIES F, GUESTS G, CONDOSTAYS C
+	WHERE F.Guest# = G.Guest#
+	  AND G.Guest# = C.Guest#
+          AND Year(C.StartDate) = '2019'
+          AND Year(C.EndDate) = '2019'
+ORDER BY G.RLName, "Ages of Children" DESC;
+
+/* Q4 (5) We're going to be increasing some condo fees. For each condo that is over 
+1000 square feet but under 1500 square feet, find the building, unit, and current 
+weekly fee. List by building. */
+SELECT C.Bldg# AS "Building Number",
+       C.UnitNum AS "Unit Number",
+       C.WeeklyFee AS "Current Weekly Fee"
+    FROM CONDOS C
+	WHERE C.SqrFt BETWEEN 1000 AND 1500
+ORDER BY 1;
+
+/* Q5 (5) (inner) We want to offer vacation weeks at a discount for all guests who 
+visited in 2019 from Northeastern states; New York, New Jersey, Massachussetts, 
+Connecticut, Pennsylvania, and New Hampshire. Find the state, last name, and phone number;
+show alphabetically by state. */
+SELECT DISTINCT G.State AS "State of Residence",
+       G.RLName AS "Guest Last Name",
+       G.Phone AS "Guest Phone Number"
+    FROM CONDOSTAYS CS JOIN GUESTS G
+      ON CS.Guest# = G.Guest#
+	WHERE G.State IN ('NY','NJ','MA','CT','PA','NH')
+	  AND YEAR(CS.StartDate) = '2019'
+	  AND YEAR(CS.EndDate) = '2019'
+ORDER BY G.State;
+
+/* Q6 (8) (inner) One of our guests staying at the resort in June 2019 requested information on our 
+availability this year. I can't remember the name of the family, but I think they have a daughter; an unusual 
+name but if I saw it, I would remember it. Find the guest number, the family name, the daughter's name, and 
+phone number of all guests matching this request. Check year. */
+SELECT DISTINCT G.Guest# AS "Guest Number",
+       G.RLName AS "Family Name",
+       F.FName AS "Daughter's Name",
+       G.Phone AS "Guest Phone Number"
+    FROM GUESTS G JOIN FAMILIES F
+      ON G.Guest# = F.Guest#
+	JOIN CONDOSTAYS CS
+	  ON G.Guest# = CS.Guest#
+	    WHERE CS.StartDate LIKE '2019-06-%'
+	      AND CS.EndDate LIKE '2019-06-%'
+	      AND F.Relationship = 'Daughter';
+
+/* Q7 (7) (inner) How many biking trips over 8 miles were reserved in 2019? Label the 
+output appropriately. Check year. */
+SELECT COUNT(R.AID) AS "Number of Biking Trips Over 8 Miles Reserved in 2019"
+    FROM ACTIVITIES A JOIN RESERVATIONS R
+      ON A.AID = R.AID
+	WHERE A.Type = 'Bike'
+	  AND A.Distance > 8
+	  AND YEAR(R.RDate) = '2019';
+
+/* Q8 (9) (simple) What are the names of the guides who led hiking trips over 1 hour long 
+in 2019? Include their hire date and list the employees who have been employed the longest,
+first. Check year */
+SELECT DISTINCT P.FName + ' ' + P.LName AS "Guide Name",
+       P.Hiredate AS "Guide Hire Date"
+    FROM GUIDES G, PERSONNEL P, 
+	 RESERVATIONS R, ACTIVITIES A
+	WHERE G.GID = P.PID
+	  AND G.GID = R.GID
+	  AND R.AID = A.AID
+	  AND A.Type = 'Hike'
+	  AND A.Hrs > 1
+	  AND YEAR(R.RDate) = '2019'
+ORDER BY P.HireDate;
+
+/* Q9 (9) (inner) Find the first and last names of all the children who went on a rafting 
+trip in July 2019 for more than 3 hours? List alphabetically by family name. Check year */
+SELECT DISTINCT F.FName AS "First Name",
+       G.RLName AS "Last Name"
+    FROM FAMILIES F JOIN GUESTS G
+      ON F.Guest# = G.Guest#
+	JOIN RESERVATIONS R
+	  ON G.Guest# = R.Guest#
+	JOIN ACTIVITIES A
+	  ON R.AID = A.AID
+	WHERE A.Type = 'Rafting'
+	  AND R.RDate LIKE '2019-07%'
+	  AND A.Hrs > 3
+ORDER BY G.RLName;
+
+/* Q10 (7) (inner) What was the average revenue for all condo rentals in 2019? Show the 
+value with 2 decimal places. Label the output, Average Revenue for Condo Rentals in 2019. 
+Check year */
+SELECT CAST(AVG(C.WeeklyFee) AS decimal(5,2)) AS "Average Revenue for Condo Rentals in 2019"
+    FROM CONDOSTAYS CS JOIN CONDOS C
+      ON CS.Condo# = C.Condo#
+	WHERE YEAR(CS.StartDate) = '2019'
+	  AND YEAR(CS.EndDate) = '2019';
+
+/* Q11 (7) (inner) We found some personal property that must be returned to one of our 
+guests. Which guests stayed in condo 10 in 2019? Find the registered first name, family name, 
+and phone number. Show the results alphabetically by family name. Check year. */
+SELECT DISTINCT G.RFName AS "First Name",
+       G.RLName AS "Family Name",
+       G.Phone AS "Family Phone Number"
+    FROM CONDOSTAYS C JOIN GUESTS G
+      ON C.Guest# = G.Guest#
+	WHERE C.Condo# = 10
+	  AND YEAR(C.StartDate) = '2019'
+	  AND YEAR(C.EndDate) = '2019'
+ORDER BY G.RLName;
+
+/* Q12 (5) (simple) What was the total that the resort earned on activities in 2019? 
+Label the output, Total Revenue for Activities in 2019. Check year */
+SELECT SUM(A.PPP * R.NumberInParty) AS "Total Revenue for Activities in 2019"
+    FROM ACTIVITIES A, RESERVATIONS R
+	WHERE A.AID = R.AID
+	  AND YEAR(R.RDate) = '2019';
+
+/* Q13 (6) (inner) We are trying to decide whether to continue the horseback riding and 
+hiking activities. How much did we make in total for both activities in 2019? 
+Label the results appropriately. */
+SELECT SUM(A.PPP * R.NumberInParty) AS "Total Revenue From Horseback Riding/Hiking"
+    FROM ACTIVITIES A JOIN RESERVATIONS R
+      ON A.AID = R.AID
+	WHERE YEAR(R.RDate) = '2019'
+	  AND (A.Type = 'HorseBack'
+	   OR A.Type = 'Hike');
+
+/* Q14 (12) (simple) As her family checked out of their condo, Madison Peterson gave her 
+bracelet to the housekeeping staff member, who was cleaning the condo, to hold for her 
+so that her sister would not break it. She forgot to ask for it back. Find the name and 
+phone number of the employee who is holding Madison's bracelet -- we need to
+return it to her. The room was cleaned Aug 17 of 2019. */
+SELECT DISTINCT P.FName + ' ' + P.LName AS "Housekeeping Staff Name",
+       P.Phone AS "Staff Phone Number"
+    FROM PERSONNEL P, CLEANING C, 
+	 CONDOSTAYS CS, GUESTS G, FAMILIES F
+	WHERE P.PID = C.HKID
+	  AND C.Condo# = CS.Condo#
+	  AND CS.Guest# = G.Guest#
+	  AND G.Guest# = F.Guest#
+	  AND C.DateCleaned = '2019-08-17'
+	  AND C.DateCleaned = CS.EndDate
+	  AND F.FName = 'Madison'
+	  AND G.RLName = 'Peterson';
+
+/* Q15 (6) (simple) For each manager, find their last name (Manager) and hire date and the 
+last names and hire dates of all employees (Employee) working under them. Show result 
+alphabetically by the manager's last name. */
+SELECT M.LName AS "Manager Last Name",
+       M.Hiredate AS "Hire Date",
+       E.LName AS "Employee Last Name",
+       E.Hiredate AS "Employee Hire Date"
+    FROM PERSONNEL E, PERSONNEL M
+	WHERE E.Mgr# = M.PID
+ORDER BY "Manager Last Name";
+
+/* Q16 (4) What is the most number of months, the least number of months, and the average 
+number of months our employees have been with the resort up to today, 2020? Label columns 
+"Most Months Employed", "Least Months Employed", and "Average Months Employed */
+SELECT MAX(DATEDIFF(MONTH,P.Hiredate,GETDATE())) AS "Most Months Employed",
+       MIN(DATEDIFF(MONTH,P.Hiredate,GETDATE())) AS "Least Months Employed",
+       AVG(DATEDIFF(MONTH,P.Hiredate,GETDATE())) AS "Average Months Employed"
+    FROM PERSONNEL P;
+
+/* Q17 (7) The price of oats is forcing an increase in all horseback riding activities of 
+15%. Make the changes in the database first and then show the description and the new price 
+of the activities. Show most expensive activity first. (You'll need to execute the update 
+and select statements separately). */
+UPDATE ACTIVITIES 
+    SET ACTIVITIES.PPP = (ACTIVITIES.PPP * 1.15)
+	WHERE ACTIVITIES.Type = 'HorseBack';
+SELECT A.Description AS "Horseback Riding Description",
+       A.PPP AS "Horseback Riding Activity Price Per Person"
+    FROM ACTIVITIES A
+	WHERE A.Type = 'HorseBack'
+ORDER BY A.PPP DESC;
+
+/* Q18 (4) (outer) Display all guests who have ever participated in an activity, and include 
+those guests who have not participated. Display the guest number and last name, the 
+reservation number, the activity number, the date of the activity, and the number who 
+participated in the activity. List the results by the reservation number. Hint: this requires
+only 1 statement. Do not test for 2019.*/
+SELECT G.Guest# AS "Guest Number",
+       G.RLName AS "Guest Last Name",
+       R.RID AS "Reservation Number",
+       R.AID AS "Activity Number",
+       R.RDate AS "Date of Activity",
+       R.NumberInParty AS "Number Who Participated in the Activity"
+    FROM GUESTS G LEFT JOIN RESERVATIONS R
+      ON G.Guest# = R.Guest#
+ORDER BY R.RID;
+
+/* Q19 (5) (outer) Display all guests who have NEVER participated in an activity. Display the guest 
+number and last name, the reservation number, the activity number, the date of the activity, and 
+the number who participated in the activity. (Show all activities for each guest) List the results 
+by the reservation number. Hint: this is a modification of Q18. Do not test for 2019. */
+SELECT G.Guest# AS "Guest Number",
+       G.RLName AS "Guest Last Name",
+       R.RID AS "Reservation Number",
+       R.AID AS "Activity Number",
+       R.RDate AS "Date of Activity",
+       R.NumberInParty AS "Number Who Participated in the Activity"
+    FROM GUESTS G LEFT JOIN RESERVATIONS R
+      ON G.Guest# = R.Guest#
+	WHERE R.RID IS NULL
+ORDER BY R.RID;
+	    
+
+
+
+
+
