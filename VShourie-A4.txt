@@ -1,0 +1,285 @@
+/* Assignment 4, Varun Shourie */
+
+/* Q1. (6) (Join) We're getting ready for the new season.  When was the last time each condo was cleaned?  
+Display the Building Number, Unit, and Date Last Cleaned. Order by the unit number within the building.
+(No need to check the date as 2019) */
+
+SELECT C.Bldg# AS "Building Number",
+       C.UnitNum AS "Unit Number",
+       MAX(CL.DateCleaned) AS "Date Last Cleaned"
+    FROM CONDOS C JOIN CLEANING CL
+      ON C.Condo# = CL.Condo#
+	GROUP BY C.Bldg#, C.UnitNum
+ORDER BY C.Bldg#, C.UnitNum;
+
+/* 2. (6) (Join) How many children does each guest have? List the guests’ first name (Guest), the spouse name (Spouse), 
+the family name (Family), and the number of children labeled Number of Children. List the smallest families first. */     
+
+SELECT G.RFName AS "Guest First Name",
+       G.SpouseFName AS "Spouse Name",
+       G.RLName AS "Family Name",
+       COUNT(F.Guest#) AS "Number of Children"
+    FROM FAMILIES F JOIN GUESTS G
+      ON F.Guest# = G.Guest#   
+        GROUP BY G.RFName, G.SpouseFName, G.RLName
+ORDER BY COUNT(F.Guest#);
+
+/* Q3. (10) (Join) For each guide, list their ID and last name (Guide), the type of activity they lead, the number of 
+reservations they had for each activity type lead, the total guests on the trips for each activity type lead, and the total $ 
+value collected for each activity type lead, for all years employed. Show the results alphabetically by the guide name, and then 
+the highest dollar amount collected for the activity types for that guide first.*/
+
+SELECT G.GID AS "Guide ID",
+       P.LName AS "Last Name",
+       A.Type AS "Type of Activity Led",
+       COUNT(R.RID) AS "Total Number of Reservations",
+       SUM(R.NumberInParty) AS "Total Number of Guests on All Trips",
+       SUM(R.NumberInParty * A.PPP) AS "Total $ Value Collected on All Trips"
+    FROM PERSONNEL P JOIN GUIDES G
+	       ON P.PID = G.GID
+	    JOIN RESERVATIONS R
+	       ON G.GID = R.GID
+	    JOIN ACTIVITIES A
+	       ON R.AID = A.AID
+              GROUP BY G.GID, P.LName, A.Type
+ORDER BY P.LName, SUM(R.NumberInParty * A.PPP) DESC;
+
+/* Q4. (6) (Join) List all activity types and descriptions that the guests participated in during July of 2019.
+Label the description Popular Activities in July, 2019. Do not include duplicate listings.
+Store the result in July2019Activities. Show the result by activity type. */
+
+CREATE VIEW July2019Activities AS
+  (SELECT DISTINCT A.Type AS "Activity Type",
+                   A.Description AS "Popular Activities in July, 2019"
+      FROM ACTIVITIES A JOIN RESERVATIONS R
+            ON R.AID = A.AID
+        JOIN GUESTS G
+            ON R.Guest# = G.Guest#
+          WHERE R.RDate LIKE '2019-07-%');
+
+SELECT *
+    FROM July2019Activities
+ORDER BY 1;
+
+/* Q5. (11) Write the fully nested query to display the city and state of all guests who reserved a rafting activity in July 
+or August of 2019. Display by state, labeled Rafting Trips in July/Aug 2019 by State. */
+SELECT G.City AS "City",
+       G.State AS "Rafting Trips in July/Aug 2019 by State"
+    FROM GUESTS G
+        WHERE G.Guest# IN
+            (SELECT R.Guest#
+                 FROM RESERVATIONS R
+                     WHERE R.AID IN
+                         (SELECT A.AID 
+                              FROM ACTIVITIES A
+                                  WHERE A.Type = 'Rafting')
+                       AND YEAR(R.RDate) = '2019'
+                       AND MONTH(R.RDate) IN ('07','08'))
+ORDER BY G.State;
+
+/* Q6. (13) Unit C305 had some items left after the last family stayed during the week of August 3, 2019. Write a fully nested 
+query to obtain a list of the children’s first names and ages. Label the names, Children Staying in C305 August 3rd Week. 
+List oldest child first. */
+
+SELECT F.FName AS "Children Staying in C305 August 3rd Week",
+       DATEDIFF(YEAR, F.Birthdate, GETDATE()) AS "Age"
+    FROM FAMILIES F
+        WHERE F.Guest# IN 
+            (SELECT G.Guest#
+                 FROM GUESTS G
+                      WHERE G.Guest# IN
+                          (SELECT CS.Guest#
+                               FROM CONDOSTAYS CS
+                                  WHERE CS.StartDate = '2019-08-03'
+                                    AND CS.Condo# IN
+                                        (SELECT C.Condo#
+                                             FROM CONDOS C
+                                                 WHERE C.Bldg# ='C'
+                                                   AND C.UnitNum = '305')))
+ORDER BY DATEDIFF(YEAR, F.Birthdate, GETDATE()) DESC;
+
+/* Q7. (9) (Join) How much money did each Guest spend on activities in 2019? Include the guest's last name and ‘Money Spent on 
+Activities in 2019’. Include only those guests spending at least $150.00. Display the highest values first. */
+
+SELECT G.RLName AS "Guest Last Name",
+       SUM(A.PPP * R.NumberInParty) AS "Money Spent on Activities in 2019"
+    FROM RESERVATIONS R JOIN GUESTS G 
+          ON R.Guest# = G.Guest#
+      JOIN ACTIVITIES A 
+          ON R.AID = A.AID
+            WHERE YEAR(R.RDate) = '2019'
+              GROUP BY G.RLName
+                HAVING SUM(A.PPP * R.NumberInParty) >= 150.00
+ORDER BY SUM(A.PPP * R.NumberInParty) DESC;
+
+
+/* Q8. (12) Write a fully nested query to display those guides who lead activities that are at least 10 miles. List their first 
+and last name and years employed with the resort. Store the result in TenMileGuides. Display the result by employee who has 
+been with the resort the longest amount of time first. Include all years. */
+CREATE VIEW TenMileGuides AS 
+    SELECT P.FName AS "Guide First Name",
+           P.LName AS "Guide Last Name",
+           DATEDIFF(YEAR,P.Hiredate,GETDATE()) AS "Years Employed with Resort"
+        FROM PERSONNEL P 
+           WHERE P.PID IN
+               (SELECT G.GID 
+                    FROM GUIDES G
+                        WHERE G.GID IN
+                            (SELECT R.GID 
+                                 FROM RESERVATIONS R
+                                    WHERE R.AID IN 
+                                        (SELECT A.AID
+                                             FROM ACTIVITIES A
+                                                WHERE A.Distance >= 10)));
+
+SELECT *
+    FROM TenMileGuides
+ORDER BY 3 DESC;
+
+/* Q9. (6) Write a transaction script to store the following data: New guests, Martin & Trudy Winters from Mankato Minnesota 
+will be staying at the resort the week starting June 6th, 2020. They have 2 children; Trevor, who was 5 on June 2, 2015 and 
+Brooke, who turned 8 on Jan 15, 2015. They have not yet decided if they want to participate in any activities. We will assign 
+them guest number G24 and place them in condo 5, A105. They can be reached at 218-555-5872. Display each record – only the 
+records added. */
+
+BEGIN TRANSACTION;
+INSERT INTO GUESTS
+    VALUES ('G24', 'Winters', 'Martin', 'Mankato', 'MN', '218-555-5872', 'Trudy');
+INSERT INTO FAMILIES
+    VALUES ('G24', 'Trevor', 'Son', '2010-06-02');
+INSERT INTO FAMILIES
+    VALUES ('G24', 'Brooke', 'Daughter', '2007-01-15');
+INSERT INTO CONDOSTAYS
+    VALUES(5, 'G24', '2020-06-06', '2020-06-13');
+SELECT *
+    FROM GUESTS G
+        WHERE G.Guest# = 'G24';
+SELECT *
+    FROM FAMILIES F
+        WHERE F.Guest# = 'G24'; 
+SELECT *
+    FROM CONDOSTAYS CS
+        WHERE CS.Guest# = 'G24'
+          AND CS.Condo# = 5;
+ROLLBACK; -- Undo the changes if there is an error in the insertion of data.
+COMMIT; -- Make the changes permanent if there are no errors and we are satisfied with the data. 
+
+/* Q10. (8) (Join) Which housekeepers were assigned a condo they did not clean; who cleaned it? Display the condo number, 
+the assigned housekeeper’s number & first & last name, the date cleaned, and the number & first & last name of the cleaning 
+housekeeper (who cleaned it). Find for all years. */
+
+SELECT CL.Condo# AS "Condo Number",
+      HK.HKID AS "Assigned Housekeeper Number",
+      P2.FName AS "Assigned Housekeeper First Name",
+      P2.LName AS "Assigned Housekeeper Last Name",
+      CL.DateCleaned AS "Date Cleaned",
+      P1.PID AS "Cleaning Housekeeper Number",
+      P1.FName AS "Cleaning Housekeeper First Name",
+      P1.LName AS "Cleaning Housekeeper Last Name"
+    FROM CLEANING CL JOIN PERSONNEL P1
+        ON CL.HKID = P1.PID
+      JOIN HOUSEKEEPING HK
+        ON CL.Condo# = HK.AssignedCondos
+      JOIN PERSONNEL P2
+        ON P2.PID = HK.HKID
+            WHERE HK.HKID <> CL.HKID;
+
+/* Q11. (6) When a new condo is added to the database, automatically add a new record to the cleaning table.
+The new condo was cleaned by AJ01 the day it is added to the condo table; use today's date
+for the DateCleaned. Show that the record has been correctly added to the cleaning table.
+Use this insert statement to test your trigger:
+Insert into condos values (99, 'Z', '101', 1030, 2, 1, 999.00); */
+
+/* Creates a trigger where a new record of cleaning will be inserted when a new condo is inserted 
+into the database */
+CREATE TRIGGER CleaningInsert
+ON CONDOS
+AFTER INSERT 
+AS 
+    INSERT INTO CLEANING 
+        VALUES (
+            (SELECT Condo#
+                FROM inserted),
+            GETDATE(),
+            'AJ01');
+/* Inserts into the condo to test the trigger */
+INSERT INTO CONDOS
+    VALUES (99, 'Z', '101', 1030, 2, 1, 999.00);
+/* Verifies the trigger works. */
+SELECT *
+    FROM CLEANING C
+        WHERE C.Condo# = 99;
+
+/* Q12. (11) Retrieve all invoice data (including details) for the McLean family for 2019, invoice 20065 (see data required on 
+EERD). They are challenging their total bill. Use a sales tax of 8% when calculating the total billed. */
+
+/* Creates a view which shows the calculation of the activity total. */
+CREATE VIEW McLeanActivityTotal AS
+    SELECT G.RLName AS 'Guest Last Name',
+           G.Guest# AS 'Guest Number',
+           ID.INV# AS 'Invoice Number',
+           R.RDate AS 'Reservation Date',
+           ID.RID AS 'Reservation #',
+           ID.AID AS 'Activity #',
+           A.PPP AS 'Price Per Person',
+           R.NumberInParty AS 'Number in Party',
+           A.PPP * R.NumberInParty AS 'Activity Total'
+        FROM GUESTS G JOIN RESERVATIONS R
+              ON G.Guest# = R.Guest#
+          JOIN ACTIVITIES A
+              ON R.AID = A.AID
+          JOIN INVOICEDETAILS ID
+              ON ID.RID = R.RID
+            WHERE G.RLName = 'McLean'
+              AND ID.INV# = '20065'
+              AND YEAR(R.RDate) = '2019';
+SELECT *
+    FROM McLeanActivityTotal;
+
+/* Creates a view which calculates the sum of all activity totals, known as the activity details total */
+CREATE VIEW McLeanDetailsTotal AS
+    SELECT MAT.[Invoice Number], 
+          MAT.[Guest Number], 
+          SUM(MAT.[Activity Total]) AS "Details Total"
+        FROM McLeanActivityTotal MAT
+          GROUP BY MAT.[Invoice Number], MAT.[Guest Number];
+SELECT *
+    FROM McLeanDetailsTotal;
+
+/* Creates a view which calculates the condo fees for the McLeans' stay. */
+CREATE VIEW McLeanCondoFees AS 
+    SELECT I.INV# AS "Invoice Number",
+           I.Condo# AS "Condo Number",
+           I.Guest# AS "Guest Number",
+           G.RLName AS "Guest Last Name",
+           CS.StartDate AS "Arrival Date",
+           CS.EndDate AS "Departure Date",
+           C.WeeklyFee AS "Condo Fee"
+    FROM INVOICE I JOIN GUESTS G
+        ON G.Guest# = I.Guest#
+      JOIN CONDOSTAYS CS
+        ON CS.Guest# = G.Guest#
+      JOIN CONDOS C
+        ON CS.Condo# = C.Condo#
+          WHERE G.RLName = 'McLean'
+            AND I.INV# = '20065'
+            AND YEAR(CS.StartDate) = '2019'
+            AND YEAR(CS.EndDate) = '2019';
+SELECT * 
+    FROM McLeanCondoFees;
+
+/* Creates a view which shows the total costs for the McLeans' stay at the resort. */
+CREATE VIEW McLeanInvoiceTotal AS 
+    SELECT CF.[Invoice Number], CF.[Condo Number],
+          CF.[Guest Number], CF.[Guest Last Name], CF.[Arrival Date],
+          CF.[Departure Date], CF.[Condo Fee], DT.[Details Total], 
+          CF.[Condo Fee] + DT.[Details Total] AS "Invoice Total",
+          CAST (((CF.[Condo Fee] + DT.[Details Total]) * 0.08) AS decimal (5,2)) AS "Sales Tax",
+          CAST (((CF.[Condo Fee] + DT.[Details Total]) * 1.08) AS decimal (6,2)) AS "Total Billed"
+      FROM McLeanCondoFees CF JOIN McLeanDetailsTotal DT
+          ON CF.[Invoice Number] = DT.[Invoice Number];
+SELECT * 
+    FROM McLeanInvoiceTotal;
+
+
+
